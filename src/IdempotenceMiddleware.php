@@ -3,8 +3,6 @@
 namespace Saundefined\Middleware;
 
 use Carbon\Carbon;
-use http\Env\Response;
-use http\Message\Body;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -42,41 +40,38 @@ class IdempotenceMiddleware
             return $response = $next($request, $response);
         }
 
-        $requestParams = serialize($request->getQueryParams());
-
-        $sql = $this->pdo->prepare('SELECT * FROM ' . $this->tableName . ' WHERE idempotence_key = :idempotence_key AND request_params = :request_params AND expire_at >= :expire_at');
-        $sql->execute([
-            'idempotence_key' => $idempotenceKey,
-            'request_params' => $requestParams,
-            'expire_at' => Carbon::now()->format('Y-m-d H:i:s')
-        ]);
-        $result = $sql->fetchObject();
-
-        if ($result) {
-            $body = new Body();
-            $body->append($result->response_body);
-
-            $response = new Response();
-            $response->setBody($body);
-            $response->setResponseStatus((int)$result->response_status);
-            $response->setHeader('Content-Type', 'application/json');
-
-            return $response;
-        }
-
         $response = $next($request, $response);
 
         if ($response instanceof ResponseInterface) {
+            $requestParams = serialize($request->getQueryParams());
+
+            $sql = $this->pdo->prepare('SELECT * FROM ' . $this->tableName . ' WHERE idempotence_key = :idempotence_key AND request = :request AND expire_at >= :expire_at');
+            $sql->execute([
+                'idempotence_key' => $idempotenceKey,
+                'request' => $requestParams,
+                'expire_at' => Carbon::now()->format('Y-m-d H:i:s')
+            ]);
+            $result = $sql->fetchObject();
+
+            if ($result) {
+                $response = $response->withStatus((int)$result->response_status);
+                $response = $response->withHeader('Content-Type', 'application/json');
+                $response->getBody()->rewind();
+                $response->getBody()->write($result->response_body);
+
+                return $response;
+            }
+
             $responseStatus = $response->getStatusCode();
             $responseBody = $response->getBody()->__toString();
 
-            $sql = $this->pdo->prepare('INSERT INTO ' . $this->tableName . ' (idempotence_key, expire_at, request_params, response_status, response_body) VALUES (:idempotence_key, :expire_at, :request_params, :response_status, :response_body)');
+            $sql = $this->pdo->prepare('INSERT INTO ' . $this->tableName . ' (idempotence_key, expire_at, request, status, body) VALUES (:idempotence_key, :expire_at, :request, :status, :body)');
             $sql->execute([
                 ':idempotence_key' => $idempotenceKey,
                 ':expire_at' => $this->expireAt->format('Y-m-d H:i:s'),
-                ':request_params' => $requestParams,
-                ':response_status' => $responseStatus,
-                ':response_body' => $responseBody
+                ':request' => $requestParams,
+                ':status' => $responseStatus,
+                ':body' => $responseBody
             ]);
         }
 
