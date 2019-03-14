@@ -13,12 +13,12 @@ composer require saundefined/idempotence-middleware
 ````sql
 
 CREATE TABLE idempotence_requests (
-  id				INT				NOT NULL AUTO_INCREMENT,
-  idempotence_key	VARCHAR(40)		NOT NULL,
-  expire_at			TIMESTAMP		NOT NULL,
-  request_params	LONGTEXT    	NULL,
-  response_status	INT(3)	    	NOT NULL,
-  response_body		LONGTEXT    	NULL,
+  id  INT NOT NULL AUTO_INCREMENT,
+  idempotence_key VARCHAR(40) NOT NULL,
+  expire_at TIMESTAMP NOT NULL,
+  request_params  LONGTEXT  NULL,
+  response_status INT(3)  NOT NULL,
+  response_body LONGTEXT  NULL,
 
   PRIMARY KEY (id)
 );
@@ -29,7 +29,7 @@ CREATE TABLE idempotence_requests (
 
 ````php
 
-$pdo = new \PDO('mysql:host=localhost;dbname=database, 'login', 'password');
+$pdo = new \PDO('mysql:host=localhost;dbname=database', 'login', 'password');
     
 $idempotence = new \Saundefined\Middleware\IdempotenceMiddleware($pdo);
 
